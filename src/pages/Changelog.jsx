@@ -3,6 +3,16 @@ import { BUILD_NUMBER } from '../config/build'
 
 const changelog = [
   {
+    version: 'Build 17',
+    date: 'December 10, 2025 • 7:52 PM MST',
+    title: 'Changelog Footer Update',
+    changes: [
+      'Replaced footer text with big "Back to Home" button',
+      'Cleaner changelog page layout',
+    ],
+    type: 'improvement'
+  },
+  {
     version: 'Build 16',
     date: 'December 10, 2025 • 7:49 PM MST',
     title: 'Timestamp Fix + Privacy Update',
@@ -327,8 +337,16 @@ export default function Changelog() {
         </div>
 
         {/* Footer */}
-        <div className="mt-12 text-center text-sm text-charcoal-600">
-          <p>All times in Mountain Standard Time (MST)</p>
+        <div className="mt-12 text-center">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-yt-red hover:bg-yt-dark-red text-white font-medium rounded-xl transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            Back to Home
+          </Link>
         </div>
       </div>
     </div>
