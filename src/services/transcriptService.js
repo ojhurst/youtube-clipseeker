@@ -1,11 +1,15 @@
 // Transcript extraction service
-// Uses local API server in development, Vercel API in production
+// Uses Railway Python backend in production, local server in development
 
 import { getYouTubeThumbnail, formatDuration } from './youtubeUtils'
 
 // Auto-detect API base URL
 const getApiBase = () => {
-  // In production (Vercel), use relative URLs
+  // Check for Railway backend URL (set this in Vercel env vars)
+  if (import.meta.env.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL
+  }
+  // In production without backend URL, try Vercel API (may not work for transcripts)
   if (import.meta.env.PROD) {
     return '/api'
   }

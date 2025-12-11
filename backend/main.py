@@ -1,0 +1,190 @@
+"""
+YouTube ClipSeeker - Transcript API Backend
+Deploy this to Railway for reliable transcript fetching
+"""
+
+import os
+import json
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api._errors import (
+    TranscriptsDisabled,
+    NoTranscriptFound,
+    VideoUnavailable,
+    NoTranscriptAvailable
+)
+import requests
+
+app = Flask(__name__)
+CORS(app)  # Allow all origins
+
+@app.route('/')
+def home():
+    return jsonify({
+        "service": "ClipSeeker Transcript API",
+        "status": "running",
+        "endpoints": {
+            "/api/transcript/<video_id>": "Get transcript for a YouTube video",
+            "/api/video-info/<video_id>": "Get video metadata",
+            "/health": "Health check"
+        }
+    })
+
+@app.route('/health')
+def health():
+    return jsonify({"status": "ok"})
+
+@app.route('/api/video-info/<video_id>')
+def video_info(video_id):
+    """Get video metadata from YouTube oEmbed"""
+    try:
+        response = requests.get(
+            f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json",
+            timeout=10
+        )
+        if response.ok:
+            data = response.json()
+            return jsonify({
+                "videoId": video_id,
+                "title": data.get("title", f"Video {video_id}"),
+                "author": data.get("author_name", "Unknown"),
+                "authorUrl": data.get("author_url", ""),
+                "thumbnail": f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+            })
+    except Exception as e:
+        print(f"Error fetching video info: {e}")
+    
+    return jsonify({
+        "videoId": video_id,
+        "title": f"Video {video_id}",
+        "author": "Unknown",
+        "thumbnail": f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+    })
+
+@app.route('/api/transcript/<video_id>')
+def get_transcript(video_id):
+    """Fetch transcript for a YouTube video"""
+    if not video_id or len(video_id) != 11:
+        return jsonify({"error": "Invalid video ID"}), 400
+
+    try:
+        print(f"Fetching transcript for: {video_id}")
+        
+        # Get video info first
+        video_data = {}
+        try:
+            response = requests.get(
+                f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json",
+                timeout=10
+            )
+            if response.ok:
+                oembed = response.json()
+                video_data = {
+                    "title": oembed.get("title", f"Video {video_id}"),
+                    "author": oembed.get("author_name", "Unknown"),
+                }
+        except:
+            video_data = {"title": f"Video {video_id}", "author": "Unknown"}
+
+        # Try to get transcript - prefer English, fall back to any language
+        transcript_list = None
+        transcript_data = None
+        language = "en"
+        is_generated = True
+
+        try:
+            # First try: Get English transcript
+            transcript_data = YouTubeTranscriptApi.get_transcript(
+                video_id, 
+                languages=['en', 'en-US', 'en-GB']
+            )
+        except NoTranscriptFound:
+            # Second try: List all transcripts and get the first available
+            try:
+                transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+                for transcript in transcript_list:
+                    transcript_data = transcript.fetch()
+                    language = transcript.language_code
+                    is_generated = transcript.is_generated
+                    break
+            except Exception as e:
+                print(f"Error listing transcripts: {e}")
+                raise
+
+        if not transcript_data:
+            return jsonify({
+                "error": "No transcript available for this video",
+                "videoId": video_id,
+                **video_data
+            }), 404
+
+        # Format transcript segments
+        segments = []
+        for item in transcript_data:
+            segments.append({
+                "start": item["start"],
+                "duration": item.get("duration", 5),
+                "end": item["start"] + item.get("duration", 5),
+                "text": item["text"]
+            })
+
+        # Calculate total duration from last segment
+        length_seconds = 0
+        if segments:
+            last_seg = segments[-1]
+            length_seconds = int(last_seg["end"])
+
+        print(f"✅ Got {len(segments)} segments for {video_id}")
+
+        return jsonify({
+            "videoId": video_id,
+            "title": video_data.get("title", f"Video {video_id}"),
+            "author": video_data.get("author", "Unknown"),
+            "thumbnail": f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
+            "language": language,
+            "isAutoGenerated": is_generated,
+            "lengthSeconds": length_seconds,
+            "transcript": segments
+        })
+
+    except TranscriptsDisabled:
+        return jsonify({
+            "error": "Transcripts are disabled for this video",
+            "videoId": video_id
+        }), 404
+
+    except NoTranscriptAvailable:
+        return jsonify({
+            "error": "No transcript available for this video",
+            "videoId": video_id
+        }), 404
+
+    except VideoUnavailable:
+        return jsonify({
+            "error": "Video is unavailable",
+            "videoId": video_id
+        }), 404
+
+    except Exception as e:
+        error_msg = str(e)
+        print(f"❌ Error for {video_id}: {error_msg}")
+        
+        # Parse common errors
+        if "IP" in error_msg or "blocked" in error_msg.lower():
+            return jsonify({
+                "error": "Rate limited by YouTube. Please try again later.",
+                "videoId": video_id
+            }), 429
+        
+        return jsonify({
+            "error": error_msg,
+            "videoId": video_id
+        }), 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    debug = os.environ.get('DEBUG', 'false').lower() == 'true'
+    print(f"🚀 ClipSeeker Transcript API starting on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=debug)
+
