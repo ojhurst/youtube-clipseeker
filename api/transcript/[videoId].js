@@ -1,5 +1,4 @@
 // Vercel Serverless Function for fetching YouTube transcripts
-// This uses the YouTube caption API directly
 
 export const config = {
   runtime: 'edge',
@@ -9,18 +8,25 @@ export default async function handler(request) {
   const url = new URL(request.url)
   const videoId = url.pathname.split('/').pop()
 
+  // Handle OPTIONS for CORS preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 200, headers: corsHeaders() })
+  }
+
   if (!videoId || videoId.length !== 11) {
     return new Response(
       JSON.stringify({ error: 'Invalid video ID' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+      { status: 400, headers: corsHeaders() }
     )
   }
 
   try {
-    // First, get video info from oEmbed
+    console.log(`Fetching transcript for: ${videoId}`)
+    
+    // Get video info
     const videoInfo = await fetchVideoInfo(videoId)
 
-    // Try to get transcript using YouTube's timedtext API
+    // Try to get transcript
     const transcript = await fetchTranscript(videoId)
 
     if (!transcript || transcript.length === 0) {
@@ -28,11 +34,14 @@ export default async function handler(request) {
         JSON.stringify({ 
           error: 'No transcript available for this video',
           videoId,
-          ...videoInfo
+          ...videoInfo,
+          debug: 'Transcript array was empty after extraction'
         }),
         { status: 404, headers: corsHeaders() }
       )
     }
+
+    console.log(`Success: ${transcript.length} segments for ${videoId}`)
 
     return new Response(
       JSON.stringify({
@@ -50,7 +59,8 @@ export default async function handler(request) {
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Failed to fetch transcript',
-        videoId
+        videoId,
+        debug: error.stack
       }),
       { status: 500, headers: corsHeaders() }
     )
@@ -91,58 +101,109 @@ async function fetchVideoInfo(videoId) {
 }
 
 async function fetchTranscript(videoId) {
-  // Method 1: Try to get transcript list from video page
   const videoPageUrl = `https://www.youtube.com/watch?v=${videoId}`
   
-  try {
-    const response = await fetch(videoPageUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-      }
-    })
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch video page: ${response.status}`)
+  const response = await fetch(videoPageUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
     }
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch video page: ${response.status}`)
+  }
 
-    const html = await response.text()
-    
-    // Extract caption track URL from ytInitialPlayerResponse
-    const captionUrlMatch = html.match(/"captionTracks":\s*\[(.*?)\]/s)
-    
-    if (!captionUrlMatch) {
-      // Try alternative pattern
-      const altMatch = html.match(/playerCaptionsTracklistRenderer.*?"captionTracks":\s*\[(.*?)\]/s)
-      if (!altMatch) {
-        throw new Error('No captions found for this video')
-      }
+  const html = await response.text()
+  
+  // Method 1: Look for captionTracks in ytInitialPlayerResponse
+  let captionUrl = null
+  
+  // Try multiple patterns to find caption URL
+  const patterns = [
+    // Pattern 1: captionTracks array
+    /"captionTracks":\s*\[\s*\{[^}]*"baseUrl":\s*"([^"]+)"/,
+    // Pattern 2: playerCaptionsTracklistRenderer
+    /playerCaptionsTracklistRenderer.*?"captionTracks":\s*\[\s*\{[^}]*"baseUrl":\s*"([^"]+)"/s,
+    // Pattern 3: Look for timedtext URL directly
+    /"(https:\/\/www\.youtube\.com\/api\/timedtext[^"]+)"/,
+    // Pattern 4: Different format
+    /captionTracks.*?baseUrl.*?"(https:[^"]+timedtext[^"]+)"/s,
+  ]
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern)
+    if (match) {
+      captionUrl = match[1]
+        .replace(/\\u0026/g, '&')
+        .replace(/\\"/g, '"')
+        .replace(/\\\//g, '/')
+      console.log(`Found caption URL with pattern: ${pattern.toString().substring(0, 50)}...`)
+      break
     }
+  }
 
-    // Parse caption tracks
-    let captionTracksJson = captionUrlMatch ? captionUrlMatch[1] : null
-    
-    if (captionTracksJson) {
-      // Find English caption URL
-      const baseUrlMatch = captionTracksJson.match(/"baseUrl":\s*"([^"]+)"/)
-      
-      if (baseUrlMatch) {
-        let captionUrl = baseUrlMatch[1].replace(/\\u0026/g, '&')
-        
-        // Fetch the caption XML
-        const captionResponse = await fetch(captionUrl)
-        if (captionResponse.ok) {
-          const captionXml = await captionResponse.text()
-          return parseTranscriptXml(captionXml)
+  // If no URL found, try to extract from ytInitialPlayerResponse JSON
+  if (!captionUrl) {
+    const playerResponseMatch = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});/)
+    if (playerResponseMatch) {
+      try {
+        const playerData = JSON.parse(playerResponseMatch[1])
+        const captions = playerData?.captions?.playerCaptionsTracklistRenderer?.captionTracks
+        if (captions && captions.length > 0) {
+          // Prefer English, fall back to first available
+          const englishTrack = captions.find(t => t.languageCode === 'en' || t.languageCode?.startsWith('en'))
+          captionUrl = (englishTrack || captions[0]).baseUrl
+          console.log('Found caption URL from JSON parse')
         }
+      } catch (e) {
+        console.warn('Failed to parse ytInitialPlayerResponse:', e.message)
       }
     }
+  }
 
-    throw new Error('Could not extract caption URL')
-    
-  } catch (error) {
-    console.error('Transcript extraction error:', error)
-    throw error
+  if (!captionUrl) {
+    // Check if captions are disabled
+    if (html.includes('"playabilityStatus":{"status":"ERROR"')) {
+      throw new Error('Video is unavailable')
+    }
+    if (html.includes('"captions":{}') || !html.includes('captionTracks')) {
+      throw new Error('No captions available - video may not have transcripts enabled')
+    }
+    throw new Error('Could not find caption URL in video page')
+  }
+
+  // Fetch the caption XML/JSON
+  console.log(`Fetching captions from: ${captionUrl.substring(0, 100)}...`)
+  
+  const captionResponse = await fetch(captionUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    }
+  })
+  
+  if (!captionResponse.ok) {
+    throw new Error(`Failed to fetch captions: ${captionResponse.status}`)
+  }
+
+  const captionData = await captionResponse.text()
+  
+  // Check if it's XML or JSON
+  if (captionData.trim().startsWith('<?xml') || captionData.trim().startsWith('<')) {
+    return parseTranscriptXml(captionData)
+  } else if (captionData.trim().startsWith('{') || captionData.trim().startsWith('[')) {
+    return parseTranscriptJson(captionData)
+  } else {
+    // Try XML parsing anyway
+    return parseTranscriptXml(captionData)
   }
 }
 
@@ -150,7 +211,7 @@ function parseTranscriptXml(xml) {
   const segments = []
   
   // Parse <text start="..." dur="...">content</text> elements
-  const textRegex = /<text start="([^"]+)" dur="([^"]+)"[^>]*>([^<]*)<\/text>/g
+  const textRegex = /<text[^>]*start="([^"]+)"[^>]*dur="([^"]+)"[^>]*>([^<]*(?:<[^/][^<]*)*)<\/text>/g
   let match
 
   while ((match = textRegex.exec(xml)) !== null) {
@@ -158,13 +219,9 @@ function parseTranscriptXml(xml) {
     const duration = parseFloat(match[2])
     let text = match[3]
     
-    // Decode HTML entities
-    text = text
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
+    // Decode HTML entities and clean up
+    text = decodeHtmlEntities(text)
+      .replace(/<[^>]+>/g, '') // Remove any HTML tags
       .replace(/\n/g, ' ')
       .trim()
 
@@ -178,6 +235,73 @@ function parseTranscriptXml(xml) {
     }
   }
 
+  // If no matches with dur, try simpler pattern
+  if (segments.length === 0) {
+    const simpleRegex = /<text[^>]*start="([^"]+)"[^>]*>([^<]+)<\/text>/g
+    while ((match = simpleRegex.exec(xml)) !== null) {
+      const start = parseFloat(match[1])
+      let text = decodeHtmlEntities(match[2]).trim()
+      
+      if (text) {
+        segments.push({
+          start,
+          duration: 5,
+          end: start + 5,
+          text
+        })
+      }
+    }
+  }
+
   return segments
 }
 
+function parseTranscriptJson(jsonStr) {
+  try {
+    const data = JSON.parse(jsonStr)
+    const segments = []
+    
+    // Handle various JSON formats YouTube might return
+    const events = data.events || data.transcript || data
+    
+    if (Array.isArray(events)) {
+      for (const event of events) {
+        if (event.segs) {
+          const text = event.segs.map(s => s.utf8).join('').trim()
+          if (text) {
+            segments.push({
+              start: (event.tStartMs || 0) / 1000,
+              duration: (event.dDurationMs || 5000) / 1000,
+              end: ((event.tStartMs || 0) + (event.dDurationMs || 5000)) / 1000,
+              text
+            })
+          }
+        } else if (event.text) {
+          segments.push({
+            start: event.start || 0,
+            duration: event.duration || 5,
+            end: (event.start || 0) + (event.duration || 5),
+            text: event.text
+          })
+        }
+      }
+    }
+    
+    return segments
+  } catch (e) {
+    console.error('Failed to parse JSON transcript:', e)
+    return []
+  }
+}
+
+function decodeHtmlEntities(text) {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(num))
+    .replace(/&#x([a-fA-F0-9]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+}
