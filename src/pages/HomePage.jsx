@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore'
 import { parseYouTubeUrl } from '../services/youtubeUtils'
 import { processVideo } from '../services/transcriptService'
 import VideoCard from '../components/VideoCard'
 import StatsDisplay from '../components/StatsDisplay'
+import SearchDropdown from '../components/SearchDropdown'
 
 // Rate limit: 5 minutes between videos
 const RATE_LIMIT_MS = 5 * 60 * 1000
@@ -25,16 +26,23 @@ export default function HomePage() {
     hasLocalDataToMigrate,
     localDataCount,
     isMigrating,
-    migrateLocalToSupabase
+    migrateLocalToSupabase,
+    search,
+    searchResults
   } = useStore()
 
-  const [url, setUrl] = useState('')
+  const [input, setInput] = useState('')
+  const [inputMode, setInputMode] = useState(null) // 'url' | 'search' | null
   const [parsedUrl, setParsedUrl] = useState(null)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [showAllVideos, setShowAllVideos] = useState(false)
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false)
+  const inputRef = useRef(null)
+  const containerRef = useRef(null)
+  const debounceRef = useRef(null)
 
   const stats = getStats()
 
@@ -62,29 +70,72 @@ export default function HomePage() {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`
   }
 
-  const handleUrlChange = useCallback((e) => {
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setShowSearchDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleInputChange = useCallback((e) => {
     const value = e.target.value
-    setUrl(value)
+    setInput(value)
     setError('')
     setSuccessMessage('')
 
+    // Clear previous debounce
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+    }
+
     if (!value.trim()) {
       setParsedUrl(null)
+      setInputMode(null)
+      setShowSearchDropdown(false)
       return
     }
 
+    // Check if it's a YouTube URL
     const parsed = parseYouTubeUrl(value)
     
-    // Only accept video URLs
     if (parsed?.type === 'video') {
       setParsedUrl(parsed)
+      setInputMode('url')
+      setShowSearchDropdown(false)
     } else if (parsed?.type === 'channel') {
       setError('Channel imports are disabled. Please paste a single video URL.')
       setParsedUrl(null)
+      setInputMode(null)
+      setShowSearchDropdown(false)
     } else {
+      // It's a search query
       setParsedUrl(null)
+      setInputMode('search')
+      
+      // Debounce search
+      debounceRef.current = setTimeout(() => {
+        if (value.trim().length >= 2 && videos.length > 0) {
+          search(value)
+          setShowSearchDropdown(true)
+        } else {
+          setShowSearchDropdown(false)
+        }
+      }, 150)
     }
-  }, [])
+  }, [search, videos.length])
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault()
+    if (inputMode === 'search' && input.trim().length >= 2) {
+      search(input)
+      navigate(`/search?q=${encodeURIComponent(input)}`)
+      setShowSearchDropdown(false)
+    }
+  }
 
   const processSingleVideo = async () => {
     if (!parsedUrl?.videoId) return
@@ -232,37 +283,96 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* URL Input */}
-        <div className="w-full max-w-2xl mx-auto">
-          <div className="relative">
-            <input
-              type="text"
-              value={url}
-              onChange={handleUrlChange}
-              placeholder="Paste a YouTube video URL..."
-              className="w-full bg-charcoal-900 border-2 border-charcoal-700 rounded-2xl py-4 px-6 text-lg text-white placeholder-charcoal-500 focus:outline-none focus:border-yt-red/50 transition-all"
-              disabled={isLoading}
+        {/* Smart Input - URL or Search */}
+        <div ref={containerRef} className="w-full max-w-2xl mx-auto relative">
+          <form onSubmit={handleSearchSubmit}>
+            <div className="relative">
+              {/* Dynamic icon based on mode */}
+              <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                {inputMode === 'url' ? (
+                  <svg className="w-5 h-5 text-yt-red" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                ) : inputMode === 'search' ? (
+                  <svg className="w-5 h-5 text-yt-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-charcoal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                )}
+              </div>
+              
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={handleInputChange}
+                placeholder="Paste a YouTube URL or search transcripts..."
+                className={`w-full bg-charcoal-900 border-2 rounded-2xl py-4 pl-12 pr-12 text-lg text-white placeholder-charcoal-500 focus:outline-none transition-all ${
+                  showSearchDropdown 
+                    ? 'border-yt-red/50 rounded-b-none' 
+                    : 'border-charcoal-700 focus:border-yt-red/50'
+                }`}
+                disabled={isLoading}
+              />
+              
+              {input && !isLoading && (
+                <button
+                  type="button"
+                  onClick={() => { 
+                    setInput(''); 
+                    setParsedUrl(null); 
+                    setInputMode(null);
+                    setError(''); 
+                    setShowSearchDropdown(false);
+                  }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-charcoal-500 hover:text-white transition-colors p-1"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </form>
+
+          {/* Search Dropdown */}
+          {showSearchDropdown && searchResults.length > 0 && (
+            <SearchDropdown 
+              results={searchResults} 
+              query={input}
+              onClose={() => setShowSearchDropdown(false)}
             />
-            {url && !isLoading && (
-              <button
-                onClick={() => { setUrl(''); setParsedUrl(null); setError(''); }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-charcoal-500 hover:text-white transition-colors p-1"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
+          )}
+
+          {/* No Results Message */}
+          {inputMode === 'search' && input.trim().length >= 2 && videos.length > 0 && searchResults.length === 0 && !showSearchDropdown && (
+            <div className="mt-4 p-4 bg-charcoal-800/50 border border-charcoal-700 rounded-xl">
+              <p className="text-sm text-charcoal-400">
+                No results for "<span className="text-white">{input}</span>" in your library
+              </p>
+            </div>
+          )}
+
+          {/* No Videos Yet Message */}
+          {inputMode === 'search' && videos.length === 0 && (
+            <div className="mt-4 p-4 bg-charcoal-800/50 border border-charcoal-700 rounded-xl">
+              <p className="text-sm text-charcoal-400">
+                Add some videos first to search their transcripts!
+              </p>
+            </div>
+          )}
 
           {/* Video Detected */}
-          {parsedUrl?.type === 'video' && (
+          {inputMode === 'url' && parsedUrl?.type === 'video' && (
             <div className="mt-4 animate-fade-in">
               <div className="flex items-center gap-2 text-sm text-charcoal-400 mb-4">
-                <svg className="w-5 h-5 text-yt-red" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z"/>
+                <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span>Video detected</span>
+                <span>YouTube video URL detected</span>
               </div>
 
               <button
@@ -290,7 +400,7 @@ export default function HomePage() {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
-                    <span>Add Video</span>
+                    <span>Add to Library</span>
                   </>
                 )}
               </button>
@@ -298,7 +408,7 @@ export default function HomePage() {
           )}
 
           {/* Cooldown Notice */}
-          {cooldownRemaining > 0 && !parsedUrl && (
+          {cooldownRemaining > 0 && !parsedUrl && inputMode !== 'search' && (
             <div className="mt-4 p-4 bg-charcoal-800/50 border border-charcoal-700 rounded-xl">
               <div className="flex items-center gap-3">
                 <svg className="w-5 h-5 text-charcoal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

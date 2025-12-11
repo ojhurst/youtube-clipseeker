@@ -3,9 +3,23 @@ import { BUILD_NUMBER } from '../config/build'
 
 const changelog = [
   {
-    version: 'Build 12',
+    version: 'Build 13',
     date: 'December 10, 2025',
     hash: 'pending',
+    title: 'Smart Input Box',
+    changes: [
+      'Main input now handles both URL paste AND transcript search',
+      'Automatically detects if input is a YouTube URL or search query',
+      'Search dropdown appears inline for quick results',
+      'Dynamic icon changes based on input mode',
+      'Updated placeholder: "Paste a YouTube URL or search transcripts..."',
+    ],
+    type: 'feature'
+  },
+  {
+    version: 'Build 12',
+    date: 'December 10, 2025',
+    hash: 'b58b9e0',
     title: 'Footer Cleanup',
     changes: [
       'Removed GitHub link from footer',
