@@ -3,9 +3,22 @@ import { BUILD_NUMBER } from '../config/build'
 
 const changelog = [
   {
-    version: 'Build 10',
+    version: 'Build 11',
     date: 'December 10, 2025',
     hash: 'pending',
+    title: 'Single Video Mode + Rate Limiting',
+    changes: [
+      'Simplified to single video uploads only (no more channel imports)',
+      '5-minute cooldown between adding videos to prevent abuse',
+      'Cleaner, simpler UI focused on individual videos',
+      'Each user can add videos using their own residential IP',
+    ],
+    type: 'feature'
+  },
+  {
+    version: 'Build 10',
+    date: 'December 10, 2025',
+    hash: '603f966',
     title: 'Client-Side Transcript Fetching',
     changes: [
       'Transcripts now fetched from user\'s browser, not server',
