@@ -3,9 +3,19 @@ import { BUILD_NUMBER } from '../config/build'
 
 const changelog = [
   {
+    version: 'Build 16',
+    date: 'December 10, 2025 • 7:49 PM MST',
+    title: 'Timestamp Fix + Privacy Update',
+    changes: [
+      'Corrected all timestamps to Mountain Standard Time (MST)',
+      'Removed all external repository links for privacy',
+      'Changelog now shows accurate build times',
+    ],
+    type: 'improvement'
+  },
+  {
     version: 'Build 15',
-    date: 'December 10, 2025 • 11:45 PM',
-    hash: 'pending',
+    date: 'December 10, 2025 • 7:45 PM MST',
     title: 'Changelog Timestamps',
     changes: [
       'Added timestamps to all changelog entries',
@@ -16,8 +26,7 @@ const changelog = [
   },
   {
     version: 'Build 14',
-    date: 'December 10, 2025 • 11:30 PM',
-    hash: '359ae5a',
+    date: 'December 10, 2025 • 7:30 PM MST',
     title: 'Mobile Video Detail Fix',
     changes: [
       'Video detail page now scrolls to top on load (shows player first)',
@@ -29,8 +38,7 @@ const changelog = [
   },
   {
     version: 'Build 13',
-    date: 'December 10, 2025 • 11:15 PM',
-    hash: 'eb75d7b',
+    date: 'December 10, 2025 • 7:15 PM MST',
     title: 'Smart Input Box',
     changes: [
       'Main input now handles both URL paste AND transcript search',
@@ -43,8 +51,7 @@ const changelog = [
   },
   {
     version: 'Build 12',
-    date: 'December 10, 2025 • 11:00 PM',
-    hash: 'b58b9e0',
+    date: 'December 10, 2025 • 7:00 PM MST',
     title: 'Footer Cleanup',
     changes: [
       'Removed GitHub link from footer',
@@ -54,8 +61,7 @@ const changelog = [
   },
   {
     version: 'Build 11',
-    date: 'December 10, 2025 • 10:45 PM',
-    hash: 'cc8e14e',
+    date: 'December 10, 2025 • 6:45 PM MST',
     title: 'Single Video Mode + Rate Limiting',
     changes: [
       'Simplified to single video uploads only (no more channel imports)',
@@ -67,8 +73,7 @@ const changelog = [
   },
   {
     version: 'Build 10',
-    date: 'December 10, 2025 • 10:30 PM',
-    hash: '603f966',
+    date: 'December 10, 2025 • 6:30 PM MST',
     title: 'Client-Side Transcript Fetching',
     changes: [
       'Transcripts now fetched from user\'s browser, not server',
@@ -81,8 +86,7 @@ const changelog = [
   },
   {
     version: 'Build 9',
-    date: 'December 10, 2025 • 10:00 PM',
-    hash: 'f753f6c',
+    date: 'December 10, 2025 • 6:00 PM MST',
     title: 'Railway Python Backend',
     changes: [
       'Deployed Python transcript backend to Railway',
@@ -94,8 +98,7 @@ const changelog = [
   },
   {
     version: 'Build 8',
-    date: 'December 10, 2025 • 9:30 PM',
-    hash: '3111ab0',
+    date: 'December 10, 2025 • 5:30 PM MST',
     title: 'Vercel API Improvements',
     changes: [
       'Enhanced Vercel serverless functions',
@@ -106,8 +109,7 @@ const changelog = [
   },
   {
     version: 'Build 7',
-    date: 'December 10, 2025 • 9:00 PM',
-    hash: 'b33bde3',
+    date: 'December 10, 2025 • 5:00 PM MST',
     title: 'Alternative Transcript API',
     changes: [
       'New approach using YouTube\'s internal transcript API',
@@ -119,21 +121,18 @@ const changelog = [
   },
   {
     version: 'Build 6',
-    date: 'December 10, 2025 • 8:30 PM',
-    hash: 'e29f6db',
+    date: 'December 10, 2025 • 4:30 PM MST',
     title: 'Footer & Changelog',
     changes: [
       'Added footer with navigation links',
       'New Changelog page with full version history',
       'Timeline layout with color-coded badges',
-      'GitHub integration with commit links',
     ],
     type: 'feature'
   },
   {
     version: 'Build 5',
-    date: 'December 10, 2025 • 8:00 PM',
-    hash: '34fccb4',
+    date: 'December 10, 2025 • 4:00 PM MST',
     title: 'Transcript Extraction Fix',
     changes: [
       'Simplified regex pattern for finding caption URLs',
@@ -144,8 +143,7 @@ const changelog = [
   },
   {
     version: 'Build 4',
-    date: 'December 10, 2025 • 7:30 PM',
-    hash: '1c9cd46',
+    date: 'December 10, 2025 • 3:30 PM MST',
     title: 'Mobile Optimization',
     changes: [
       'Full mobile-responsive search dropdown',
@@ -158,8 +156,7 @@ const changelog = [
   },
   {
     version: 'Build 3',
-    date: 'December 10, 2025 • 7:00 PM',
-    hash: '05f7b19',
+    date: 'December 10, 2025 • 3:00 PM MST',
     title: 'Build Number Display',
     changes: [
       'Added version indicator in header',
@@ -169,8 +166,7 @@ const changelog = [
   },
   {
     version: 'Build 2',
-    date: 'December 10, 2025 • 6:30 PM',
-    hash: 'a11d259',
+    date: 'December 10, 2025 • 2:30 PM MST',
     title: 'Enhanced Transcript Extraction',
     changes: [
       'Multiple regex patterns for caption URL detection',
@@ -182,8 +178,7 @@ const changelog = [
   },
   {
     version: 'Build 1',
-    date: 'December 10, 2025 • 6:00 PM',
-    hash: '8528286',
+    date: 'December 10, 2025 • 2:00 PM MST',
     title: 'Vercel API Routing Fix',
     changes: [
       'Fixed SPA rewrite interfering with API routes',
@@ -193,8 +188,7 @@ const changelog = [
   },
   {
     version: '1.0.0',
-    date: 'December 10, 2025 • 5:00 PM',
-    hash: '25a08b8',
+    date: 'December 10, 2025 • 1:00 PM MST',
     title: 'Cloud Migration Feature',
     changes: [
       'Local IndexedDB to Supabase migration',
@@ -205,8 +199,7 @@ const changelog = [
   },
   {
     version: '0.9.0',
-    date: 'December 10, 2025 • 4:00 PM',
-    hash: 'acd0706',
+    date: 'December 10, 2025 • 12:00 PM MST',
     title: 'Supabase Integration',
     changes: [
       'Supabase CLI configuration',
@@ -217,8 +210,7 @@ const changelog = [
   },
   {
     version: '0.1.0',
-    date: 'December 10, 2025 • 12:00 PM',
-    hash: '0253947',
+    date: 'December 10, 2025 • 10:00 AM MST',
     title: 'Initial Release',
     changes: [
       'YouTube video transcript extraction',
@@ -284,7 +276,7 @@ export default function Changelog() {
           {/* Entries */}
           <div className="space-y-8">
             {changelog.map((entry, index) => (
-              <div key={entry.hash} className="relative pl-8">
+              <div key={index} className="relative pl-8">
                 {/* Dot */}
                 <div className={`absolute left-0 top-1.5 w-4 h-4 rounded-full border-2 ${
                   index === 0 
@@ -310,15 +302,6 @@ export default function Changelog() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span>{entry.date}</span>
-                    <span className="text-charcoal-600">•</span>
-                    <a 
-                      href={`https://github.com/ojhurst/youtube-clipseeker/commit/${entry.hash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-charcoal-600 hover:text-yt-red transition-colors"
-                    >
-                      {entry.hash.substring(0, 7)}
-                    </a>
                   </div>
 
                   {/* Title */}
@@ -345,7 +328,7 @@ export default function Changelog() {
 
         {/* Footer */}
         <div className="mt-12 text-center text-sm text-charcoal-600">
-          <p>All times shown in local timezone</p>
+          <p>All times in Mountain Standard Time (MST)</p>
         </div>
       </div>
     </div>
