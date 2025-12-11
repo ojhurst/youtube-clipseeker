@@ -3,9 +3,21 @@ import { BUILD_NUMBER } from '../config/build'
 
 const changelog = [
   {
-    version: 'Build 14',
-    date: 'December 10, 2025',
+    version: 'Build 15',
+    date: 'December 10, 2025 • 11:45 PM',
     hash: 'pending',
+    title: 'Changelog Timestamps',
+    changes: [
+      'Added timestamps to all changelog entries',
+      'Retroactively added times to all previous builds',
+      'Will include timestamps on all future updates',
+    ],
+    type: 'improvement'
+  },
+  {
+    version: 'Build 14',
+    date: 'December 10, 2025 • 11:30 PM',
+    hash: '359ae5a',
     title: 'Mobile Video Detail Fix',
     changes: [
       'Video detail page now scrolls to top on load (shows player first)',
@@ -17,7 +29,7 @@ const changelog = [
   },
   {
     version: 'Build 13',
-    date: 'December 10, 2025',
+    date: 'December 10, 2025 • 11:15 PM',
     hash: 'eb75d7b',
     title: 'Smart Input Box',
     changes: [
@@ -31,7 +43,7 @@ const changelog = [
   },
   {
     version: 'Build 12',
-    date: 'December 10, 2025',
+    date: 'December 10, 2025 • 11:00 PM',
     hash: 'b58b9e0',
     title: 'Footer Cleanup',
     changes: [
@@ -42,7 +54,7 @@ const changelog = [
   },
   {
     version: 'Build 11',
-    date: 'December 10, 2025',
+    date: 'December 10, 2025 • 10:45 PM',
     hash: 'cc8e14e',
     title: 'Single Video Mode + Rate Limiting',
     changes: [
@@ -55,7 +67,7 @@ const changelog = [
   },
   {
     version: 'Build 10',
-    date: 'December 10, 2025',
+    date: 'December 10, 2025 • 10:30 PM',
     hash: '603f966',
     title: 'Client-Side Transcript Fetching',
     changes: [
@@ -69,8 +81,8 @@ const changelog = [
   },
   {
     version: 'Build 9',
-    date: 'December 10, 2025',
-    hash: 'pending',
+    date: 'December 10, 2025 • 10:00 PM',
+    hash: 'f753f6c',
     title: 'Railway Python Backend',
     changes: [
       'Deployed Python transcript backend to Railway',
@@ -82,8 +94,8 @@ const changelog = [
   },
   {
     version: 'Build 8',
-    date: 'December 10, 2025',
-    hash: 'pending',
+    date: 'December 10, 2025 • 9:30 PM',
+    hash: '3111ab0',
     title: 'Vercel API Improvements',
     changes: [
       'Enhanced Vercel serverless functions',
@@ -94,8 +106,8 @@ const changelog = [
   },
   {
     version: 'Build 7',
-    date: 'December 10, 2025',
-    hash: 'pending',
+    date: 'December 10, 2025 • 9:00 PM',
+    hash: 'b33bde3',
     title: 'Alternative Transcript API',
     changes: [
       'New approach using YouTube\'s internal transcript API',
@@ -107,7 +119,7 @@ const changelog = [
   },
   {
     version: 'Build 6',
-    date: 'December 10, 2025',
+    date: 'December 10, 2025 • 8:30 PM',
     hash: 'e29f6db',
     title: 'Footer & Changelog',
     changes: [
@@ -120,7 +132,7 @@ const changelog = [
   },
   {
     version: 'Build 5',
-    date: 'December 10, 2025',
+    date: 'December 10, 2025 • 8:00 PM',
     hash: '34fccb4',
     title: 'Transcript Extraction Fix',
     changes: [
@@ -132,7 +144,7 @@ const changelog = [
   },
   {
     version: 'Build 4',
-    date: 'December 10, 2025',
+    date: 'December 10, 2025 • 7:30 PM',
     hash: '1c9cd46',
     title: 'Mobile Optimization',
     changes: [
@@ -146,7 +158,7 @@ const changelog = [
   },
   {
     version: 'Build 3',
-    date: 'December 10, 2025',
+    date: 'December 10, 2025 • 7:00 PM',
     hash: '05f7b19',
     title: 'Build Number Display',
     changes: [
@@ -157,7 +169,7 @@ const changelog = [
   },
   {
     version: 'Build 2',
-    date: 'December 10, 2025',
+    date: 'December 10, 2025 • 6:30 PM',
     hash: 'a11d259',
     title: 'Enhanced Transcript Extraction',
     changes: [
@@ -170,7 +182,7 @@ const changelog = [
   },
   {
     version: 'Build 1',
-    date: 'December 10, 2025',
+    date: 'December 10, 2025 • 6:00 PM',
     hash: '8528286',
     title: 'Vercel API Routing Fix',
     changes: [
@@ -181,7 +193,7 @@ const changelog = [
   },
   {
     version: '1.0.0',
-    date: 'December 10, 2025',
+    date: 'December 10, 2025 • 5:00 PM',
     hash: '25a08b8',
     title: 'Cloud Migration Feature',
     changes: [
@@ -193,7 +205,7 @@ const changelog = [
   },
   {
     version: '0.9.0',
-    date: 'December 10, 2025',
+    date: 'December 10, 2025 • 4:00 PM',
     hash: 'acd0706',
     title: 'Supabase Integration',
     changes: [
@@ -205,7 +217,7 @@ const changelog = [
   },
   {
     version: '0.1.0',
-    date: 'December 10, 2025',
+    date: 'December 10, 2025 • 12:00 PM',
     hash: '0253947',
     title: 'Initial Release',
     changes: [
@@ -290,17 +302,22 @@ export default function Changelog() {
                     <span className="text-sm font-mono text-charcoal-500">
                       {entry.version}
                     </span>
+                  </div>
+                  
+                  {/* Date & Time */}
+                  <div className="flex items-center gap-2 mb-3 text-sm text-charcoal-500">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{entry.date}</span>
                     <span className="text-charcoal-600">•</span>
-                    <span className="text-sm text-charcoal-500">
-                      {entry.date}
-                    </span>
                     <a 
                       href={`https://github.com/ojhurst/youtube-clipseeker/commit/${entry.hash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs font-mono text-charcoal-600 hover:text-yt-red transition-colors"
+                      className="font-mono text-charcoal-600 hover:text-yt-red transition-colors"
                     >
-                      {entry.hash}
+                      {entry.hash.substring(0, 7)}
                     </a>
                   </div>
 
@@ -328,20 +345,9 @@ export default function Changelog() {
 
         {/* Footer */}
         <div className="mt-12 text-center text-sm text-charcoal-600">
-          <p>
-            View the full source on{' '}
-            <a 
-              href="https://github.com/ojhurst/youtube-clipseeker"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-yt-red hover:underline"
-            >
-              GitHub
-            </a>
-          </p>
+          <p>All times shown in local timezone</p>
         </div>
       </div>
     </div>
   )
 }
-
