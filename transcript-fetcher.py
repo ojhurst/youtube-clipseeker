@@ -6,15 +6,31 @@ Uses youtube-transcript-api for reliable transcript extraction
 
 import sys
 import json
+import ssl
+import certifi
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
+
+# Fix SSL certificate issues on macOS
+os.environ['SSL_CERT_FILE'] = certifi.where()
+os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+
+# Also set default SSL context
+try:
+    ssl._create_default_https_context = ssl._create_unverified_context
+except:
+    pass
 
 try:
     from youtube_transcript_api import YouTubeTranscriptApi
 except ImportError:
-    print("Installing youtube-transcript-api...")
+    print("Installing dependencies...")
     import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "youtube-transcript-api", "-q"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "youtube-transcript-api", "certifi", "-q"])
+    import certifi
+    os.environ['SSL_CERT_FILE'] = certifi.where()
+    os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
     from youtube_transcript_api import YouTubeTranscriptApi
 
 class TranscriptHandler(BaseHTTPRequestHandler):
