@@ -2,6 +2,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useStore } from '../store/useStore'
 import SearchDropdown from './SearchDropdown'
+import { BUILD_VERSION } from '../config/build'
 
 export default function Header() {
   const navigate = useNavigate()
@@ -178,6 +179,11 @@ export default function Header() {
                 </span>
               )}
             </Link>
+            
+            {/* Build Number */}
+            <span className="hidden md:block text-xs text-yt-red font-mono ml-3 opacity-75">
+              {BUILD_VERSION}
+            </span>
           </nav>
         </div>
       </div>
