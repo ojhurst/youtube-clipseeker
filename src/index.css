@@ -1,0 +1,167 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --yt-red: #FF0000;
+  --yt-dark-red: #CC0000;
+  --bg-primary: #121214;
+  --bg-secondary: #1f1f22;
+  --bg-tertiary: #37373b;
+  --text-primary: #f6f6f7;
+  --text-secondary: #a2a2aa;
+  --text-muted: #7e7e88;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'DM Sans', system-ui, sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4f4f57;
+}
+
+/* Highlight animation for search results */
+.highlight-match {
+  background: linear-gradient(135deg, rgba(255, 0, 0, 0.3), rgba(255, 0, 0, 0.15));
+  color: #fff;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-weight: 500;
+}
+
+/* Transcript timestamp styles */
+.transcript-timestamp {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--yt-red);
+  min-width: 4rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.transcript-timestamp:hover {
+  color: #fff;
+  transform: scale(1.05);
+}
+
+/* Active transcript line */
+.transcript-line-active {
+  background: linear-gradient(90deg, rgba(255, 0, 0, 0.15), transparent);
+  border-left: 3px solid var(--yt-red);
+  padding-left: 0.75rem;
+}
+
+/* Loading shimmer effect */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary) 25%,
+    var(--bg-tertiary) 50%,
+    var(--bg-secondary) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+/* Progress bar glow */
+.progress-glow {
+  box-shadow: 0 0 20px rgba(255, 0, 0, 0.4), 0 0 40px rgba(255, 0, 0, 0.2);
+}
+
+/* Video card hover effect */
+.video-card {
+  transition: all 0.2s ease;
+}
+
+.video-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* Input focus ring */
+.input-focus {
+  transition: all 0.2s ease;
+}
+
+.input-focus:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.3);
+}
+
+/* Button hover effects */
+.btn-primary {
+  background: linear-gradient(135deg, var(--yt-red), var(--yt-dark-red));
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 0, 0, 0.35);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Floating geometric shapes for background */
+.bg-shapes {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bg-shapes::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  right: -10%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(255, 0, 0, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+.bg-shapes::after {
+  content: '';
+  position: absolute;
+  bottom: -20%;
+  left: -10%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(255, 0, 0, 0.05) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
