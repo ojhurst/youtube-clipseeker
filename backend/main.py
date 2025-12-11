@@ -177,6 +177,13 @@ def get_transcript(video_id):
                 "videoId": video_id
             }), 429
         
+        if "no element found" in error_msg.lower() or "xml" in error_msg.lower():
+            return jsonify({
+                "error": "YouTube is blocking requests. This may be temporary - try again in a few minutes.",
+                "videoId": video_id,
+                "detail": "Railway IP may be rate-limited by YouTube"
+            }), 429
+        
         return jsonify({
             "error": error_msg,
             "videoId": video_id
