@@ -3,6 +3,20 @@ import { BUILD_NUMBER } from '../config/build'
 
 const changelog = [
   {
+    version: 'Build 18',
+    date: 'December 10, 2025 • 7:55 PM MST',
+    title: 'Improved Transcript Fetching',
+    changes: [
+      'Added 3 different methods to fetch transcripts',
+      'Method 1: Direct timedtext API with multiple language codes',
+      'Method 2: Parse video page for caption tracks',
+      'Method 3: Innertube API extraction',
+      'Better error logging to diagnose issues',
+      'Tries all methods before giving up',
+    ],
+    type: 'fix'
+  },
+  {
     version: 'Build 17',
     date: 'December 10, 2025 • 7:52 PM MST',
     title: 'Changelog Footer Update',
