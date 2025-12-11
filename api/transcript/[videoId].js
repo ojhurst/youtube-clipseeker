@@ -1,4 +1,5 @@
 // Vercel Serverless Function for fetching YouTube transcripts
+// Uses YouTube's internal transcript API directly
 
 export const config = {
   runtime: 'edge',
@@ -23,7 +24,7 @@ export default async function handler(request) {
     console.log(`Fetching transcript for: ${videoId}`)
     
     const videoInfo = await fetchVideoInfo(videoId)
-    const transcript = await fetchTranscript(videoId)
+    const transcript = await fetchTranscriptDirect(videoId)
 
     if (!transcript || transcript.length === 0) {
       return new Response(
@@ -50,7 +51,7 @@ export default async function handler(request) {
     )
 
   } catch (error) {
-    console.error('Transcript fetch error:', error)
+    console.error('Transcript fetch error:', error.message)
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Failed to fetch transcript',
@@ -94,90 +95,196 @@ async function fetchVideoInfo(videoId) {
   }
 }
 
-async function fetchTranscript(videoId) {
-  const videoPageUrl = `https://www.youtube.com/watch?v=${videoId}`
-  
-  const response = await fetch(videoPageUrl, {
+// Direct approach: fetch video page to get the serialized player response, 
+// then extract transcript params and fetch transcript
+async function fetchTranscriptDirect(videoId) {
+  // Step 1: Get the video page to extract necessary tokens
+  const videoPageResponse = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept': 'text/html,application/xhtml+xml',
     }
   })
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch video page: ${response.status}`)
+
+  if (!videoPageResponse.ok) {
+    throw new Error(`Failed to fetch video page: ${videoPageResponse.status}`)
   }
 
-  const html = await response.text()
-  
-  // Simple and direct: find the timedtext URL
-  // Look for: "baseUrl":"https://www.youtube.com/api/timedtext?...
-  const timedtextMatch = html.match(/"baseUrl"\s*:\s*"(https:\/\/www\.youtube\.com\/api\/timedtext[^"]+)"/i)
-  
-  if (!timedtextMatch) {
-    // Try alternative: look in captionTracks
-    const captionTracksMatch = html.match(/"captionTracks"\s*:\s*\[([\s\S]*?)\]/)
-    if (captionTracksMatch) {
-      const tracksContent = captionTracksMatch[1]
-      const urlMatch = tracksContent.match(/"baseUrl"\s*:\s*"([^"]+)"/)
-      if (urlMatch) {
-        const captionUrl = urlMatch[1]
-          .replace(/\\u0026/g, '&')
-          .replace(/\\\//g, '/')
-        return await fetchAndParseCaptions(captionUrl)
+  const html = await videoPageResponse.text()
+
+  // Try Method 1: Direct timedtext URL from page
+  const timedtextResult = await tryTimedtextMethod(html)
+  if (timedtextResult && timedtextResult.length > 0) {
+    return timedtextResult
+  }
+
+  // Try Method 2: YouTube's internal transcript API
+  const internalApiResult = await tryInternalApiMethod(html, videoId)
+  if (internalApiResult && internalApiResult.length > 0) {
+    return internalApiResult
+  }
+
+  throw new Error('Could not retrieve transcript - no captions found')
+}
+
+async function tryTimedtextMethod(html) {
+  // Look for timedtext URL in the page
+  const patterns = [
+    /"baseUrl"\s*:\s*"(https:\\\/\\\/www\.youtube\.com\\\/api\\\/timedtext[^"]+)"/,
+    /"baseUrl":"(https:\/\/www\.youtube\.com\/api\/timedtext[^"]+)"/,
+    /timedtext[^"]*v=([^"&]+)[^"]*"/,
+  ]
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern)
+    if (match) {
+      let url = match[1]
+      // Unescape the URL
+      url = url
+        .replace(/\\u0026/g, '&')
+        .replace(/\\\//g, '/')
+        .replace(/\\"/g, '"')
+
+      try {
+        const response = await fetch(url, {
+          headers: { 'User-Agent': 'Mozilla/5.0' }
+        })
+        if (response.ok) {
+          const data = await response.text()
+          if (data.includes('<text')) {
+            return parseXmlTranscript(data)
+          }
+        }
+      } catch (e) {
+        console.warn('Timedtext fetch failed:', e.message)
       }
     }
-    
-    // Check if video exists but has no captions
-    if (html.includes('"playabilityStatus"') && !html.includes('captionTracks')) {
-      throw new Error('This video does not have captions available')
-    }
-    
-    throw new Error('Could not find caption URL')
   }
-
-  // Clean up the URL (unescape unicode)
-  const captionUrl = timedtextMatch[1]
-    .replace(/\\u0026/g, '&')
-    .replace(/\\\//g, '/')
-  
-  return await fetchAndParseCaptions(captionUrl)
+  return null
 }
 
-async function fetchAndParseCaptions(captionUrl) {
-  console.log(`Fetching captions from: ${captionUrl.substring(0, 80)}...`)
+async function tryInternalApiMethod(html, videoId) {
+  // Extract the params needed for the transcript API
+  // Look for the transcript panel params in ytInitialData
   
-  const response = await fetch(captionUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+  // Find engagement panels with transcript
+  const panelMatch = html.match(/"engagementPanels":\s*(\[[\s\S]*?\])\s*,\s*"topbar"/)
+  if (!panelMatch) {
+    // Try alternative: look for serializedShareEntity or other markers
+    const transcriptMatch = html.match(/"params"\s*:\s*"([^"]+)"[^}]*"transcriptSearchPanel"/)
+    if (transcriptMatch) {
+      return await fetchTranscriptFromParams(transcriptMatch[1], videoId)
     }
-  })
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch captions: ${response.status}`)
+    return null
   }
 
-  const data = await response.text()
-  
-  // Try XML parsing first (most common)
-  if (data.includes('<text')) {
-    return parseTranscriptXml(data)
+  try {
+    // Find transcript params in engagement panels
+    const paramsMatch = html.match(/"transcriptEndpoint"\s*:\s*\{[^}]*"params"\s*:\s*"([^"]+)"/)
+    if (paramsMatch) {
+      return await fetchTranscriptFromParams(paramsMatch[1], videoId)
+    }
+  } catch (e) {
+    console.warn('Internal API method failed:', e.message)
   }
-  
-  // Try JSON parsing
-  if (data.trim().startsWith('{') || data.trim().startsWith('[')) {
-    return parseTranscriptJson(data)
-  }
-  
-  // Fallback to XML parsing
-  return parseTranscriptXml(data)
+
+  return null
 }
 
-function parseTranscriptXml(xml) {
+async function fetchTranscriptFromParams(params, videoId) {
+  // Use YouTube's internal API to fetch transcript
+  const apiUrl = 'https://www.youtube.com/youtubei/v1/get_transcript'
+  
+  const body = {
+    context: {
+      client: {
+        clientName: 'WEB',
+        clientVersion: '2.20231219.04.00',
+        hl: 'en',
+        gl: 'US',
+      }
+    },
+    params: params
+  }
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+      body: JSON.stringify(body)
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      return parseInternalApiResponse(data)
+    }
+  } catch (e) {
+    console.warn('Transcript API call failed:', e.message)
+  }
+
+  return null
+}
+
+function parseInternalApiResponse(data) {
   const segments = []
   
-  // Match <text start="X" dur="Y">content</text>
+  // Navigate the response structure
+  const actions = data?.actions || []
+  for (const action of actions) {
+    const transcriptRenderer = action?.updateEngagementPanelAction?.content?.transcriptRenderer
+    const body = transcriptRenderer?.content?.transcriptSearchPanelRenderer?.body
+    const segmentList = body?.transcriptSegmentListRenderer?.initialSegments || 
+                        transcriptRenderer?.body?.transcriptSegmentListRenderer?.initialSegments || []
+
+    for (const segment of segmentList) {
+      const seg = segment?.transcriptSegmentRenderer
+      if (seg) {
+        const startMs = parseInt(seg.startMs || '0')
+        const endMs = parseInt(seg.endMs || '0')
+        const text = seg.snippet?.runs?.map(r => r.text).join('') || ''
+        
+        if (text.trim()) {
+          segments.push({
+            start: startMs / 1000,
+            duration: (endMs - startMs) / 1000,
+            end: endMs / 1000,
+            text: text.trim()
+          })
+        }
+      }
+    }
+  }
+
+  // Also try direct transcript body
+  if (segments.length === 0 && data?.body?.transcriptBodyRenderer?.cueGroups) {
+    for (const group of data.body.transcriptBodyRenderer.cueGroups) {
+      const cue = group?.transcriptCueGroupRenderer?.cues?.[0]?.transcriptCueRenderer
+      if (cue) {
+        const startMs = parseInt(cue.startOffsetMs || '0')
+        const durationMs = parseInt(cue.durationMs || '5000')
+        const text = cue.cue?.simpleText || cue.cue?.runs?.map(r => r.text).join('') || ''
+        
+        if (text.trim()) {
+          segments.push({
+            start: startMs / 1000,
+            duration: durationMs / 1000,
+            end: (startMs + durationMs) / 1000,
+            text: text.trim()
+          })
+        }
+      }
+    }
+  }
+
+  return segments
+}
+
+function parseXmlTranscript(xml) {
+  const segments = []
   const regex = /<text[^>]*start="([\d.]+)"[^>]*(?:dur="([\d.]+)")?[^>]*>([\s\S]*?)<\/text>/gi
   let match
 
@@ -185,9 +292,11 @@ function parseTranscriptXml(xml) {
     const start = parseFloat(match[1])
     const duration = match[2] ? parseFloat(match[2]) : 5
     let text = match[3]
-    
-    // Decode HTML entities
-    text = decodeEntities(text)
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
       .replace(/<[^>]+>/g, '')
       .replace(/\s+/g, ' ')
       .trim()
@@ -203,45 +312,4 @@ function parseTranscriptXml(xml) {
   }
 
   return segments
-}
-
-function parseTranscriptJson(jsonStr) {
-  try {
-    const data = JSON.parse(jsonStr)
-    const segments = []
-    const events = data.events || data.transcript || data
-    
-    if (Array.isArray(events)) {
-      for (const event of events) {
-        if (event.segs) {
-          const text = event.segs.map(s => s.utf8 || '').join('').trim()
-          if (text) {
-            segments.push({
-              start: (event.tStartMs || 0) / 1000,
-              duration: (event.dDurationMs || 5000) / 1000,
-              end: ((event.tStartMs || 0) + (event.dDurationMs || 5000)) / 1000,
-              text
-            })
-          }
-        }
-      }
-    }
-    
-    return segments
-  } catch (e) {
-    console.error('JSON parse error:', e)
-    return []
-  }
-}
-
-function decodeEntities(text) {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n))
-    .replace(/&#x([a-fA-F0-9]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
 }

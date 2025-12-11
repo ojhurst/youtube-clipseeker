@@ -3,6 +3,32 @@ import { BUILD_NUMBER } from '../config/build'
 
 const changelog = [
   {
+    version: 'Build 7',
+    date: 'December 10, 2025',
+    hash: 'pending',
+    title: 'Alternative Transcript API',
+    changes: [
+      'New approach using YouTube\'s internal transcript API',
+      'Multiple fallback methods for transcript extraction',
+      'Better compatibility with Vercel edge runtime',
+      'Parses both timedtext XML and internal API JSON formats',
+    ],
+    type: 'improvement'
+  },
+  {
+    version: 'Build 6',
+    date: 'December 10, 2025',
+    hash: 'e29f6db',
+    title: 'Footer & Changelog',
+    changes: [
+      'Added footer with navigation links',
+      'New Changelog page with full version history',
+      'Timeline layout with color-coded badges',
+      'GitHub integration with commit links',
+    ],
+    type: 'feature'
+  },
+  {
     version: 'Build 5',
     date: 'December 10, 2025',
     hash: '34fccb4',
