@@ -3,9 +3,20 @@ import { BUILD_NUMBER } from '../config/build'
 
 const changelog = [
   {
-    version: 'Build 11',
+    version: 'Build 12',
     date: 'December 10, 2025',
     hash: 'pending',
+    title: 'Footer Cleanup',
+    changes: [
+      'Removed GitHub link from footer',
+      'Cleaner footer with just Changelog link and build version',
+    ],
+    type: 'improvement'
+  },
+  {
+    version: 'Build 11',
+    date: 'December 10, 2025',
+    hash: 'cc8e14e',
     title: 'Single Video Mode + Rate Limiting',
     changes: [
       'Simplified to single video uploads only (no more channel imports)',
