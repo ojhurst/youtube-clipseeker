@@ -206,6 +206,16 @@ export const useStore = create((set, get) => ({
       videos.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
 
       set({ db, isDBReady: true, videos, channels, failedVideos })
+      
+      // Check if we should offer migration
+      if (isSupabaseConfigured() && videos.length === 0) {
+        // Check if there's local data to migrate
+        const localDb = await initIndexedDB()
+        const localVideos = await localDb.getAll('videos')
+        if (localVideos.length > 0) {
+          set({ hasLocalDataToMigrate: true, localDataCount: localVideos.length })
+        }
+      }
     } catch (error) {
       console.error('Failed to initialize database:', error)
       // Fallback to IndexedDB if Supabase fails
@@ -217,6 +227,71 @@ export const useStore = create((set, get) => ({
         const failedVideos = await db.getAll('failedVideos')
         set({ db, isDBReady: true, videos, channels, failedVideos, storageMode: 'indexeddb' })
       }
+    }
+  },
+
+  // Migration flags
+  hasLocalDataToMigrate: false,
+  localDataCount: 0,
+  isMigrating: false,
+
+  // Migrate local IndexedDB data to Supabase
+  migrateLocalToSupabase: async () => {
+    if (!isSupabaseConfigured()) {
+      console.error('Supabase not configured')
+      return { success: false, error: 'Supabase not configured' }
+    }
+
+    set({ isMigrating: true })
+
+    try {
+      const localDb = await initIndexedDB()
+      
+      // Get all local data
+      const localVideos = await localDb.getAll('videos')
+      const localChannels = await localDb.getAll('channels')
+      const localFailedVideos = await localDb.getAll('failedVideos')
+
+      console.log(`📦 Migrating ${localVideos.length} videos, ${localChannels.length} channels...`)
+
+      // Migrate channels first (videos reference them)
+      for (const channel of localChannels) {
+        await storage.putChannel(channel, null)
+      }
+
+      // Migrate videos
+      for (const video of localVideos) {
+        await storage.putVideo(video, null)
+      }
+
+      // Migrate failed videos
+      for (const failed of localFailedVideos) {
+        await storage.putFailedVideo(failed, null)
+      }
+
+      // Reload from Supabase
+      const videos = await storage.getAllVideos() || []
+      const channels = await storage.getAllChannels() || []
+      const failedVideos = await storage.getAllFailedVideos() || []
+
+      videos.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
+
+      set({ 
+        videos, 
+        channels, 
+        failedVideos, 
+        hasLocalDataToMigrate: false,
+        localDataCount: 0,
+        isMigrating: false
+      })
+
+      console.log('✅ Migration complete!')
+      return { success: true, videosCount: localVideos.length, channelsCount: localChannels.length }
+
+    } catch (error) {
+      console.error('Migration failed:', error)
+      set({ isMigrating: false })
+      return { success: false, error: error.message }
     }
   },
 

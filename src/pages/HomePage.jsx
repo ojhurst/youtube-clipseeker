@@ -19,7 +19,12 @@ export default function HomePage() {
     deleteVideo,
     failedVideos,
     clearFailedVideo,
-    getStats
+    getStats,
+    hasLocalDataToMigrate,
+    localDataCount,
+    isMigrating,
+    migrateLocalToSupabase,
+    storageMode
   } = useStore()
 
   const [url, setUrl] = useState('')
@@ -333,8 +338,64 @@ export default function HomePage() {
     }
   }
 
+  const handleMigration = async () => {
+    const result = await migrateLocalToSupabase()
+    if (result.success) {
+      setSuccessMessage(`Successfully migrated ${result.videosCount} videos and ${result.channelsCount} channels to Supabase!`)
+    } else {
+      setError(`Migration failed: ${result.error}`)
+    }
+  }
+
   return (
     <div className="min-h-[calc(100vh-5rem)] flex flex-col">
+      {/* Migration Banner */}
+      {hasLocalDataToMigrate && (
+        <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-b border-blue-500/30">
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-white font-medium">
+                    Found {localDataCount} videos in local storage
+                  </p>
+                  <p className="text-sm text-blue-300/80">
+                    Migrate to Supabase to access your library from anywhere
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleMigration}
+                disabled={isMigrating}
+                className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 rounded-xl text-white font-medium flex items-center gap-2 transition-colors"
+              >
+                {isMigrating ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Migrating...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    Migrate to Cloud
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section className="flex-1 flex flex-col items-center justify-center px-4 py-12">
         <div className="max-w-3xl mx-auto text-center mb-12">
