@@ -3,6 +3,45 @@ import { BUILD_NUMBER } from '../config/build'
 
 const changelog = [
   {
+    version: 'Build 10',
+    date: 'December 10, 2025',
+    hash: 'pending',
+    title: 'Client-Side Transcript Fetching',
+    changes: [
+      'Transcripts now fetched from user\'s browser, not server',
+      'Each user uses their own IP - YouTube won\'t block residential IPs',
+      'CORS proxy approach to fetch directly from YouTube',
+      'Server-side fallback if client-side fails',
+      '1000 users = 1000 different IPs instead of one blocked cloud IP',
+    ],
+    type: 'feature'
+  },
+  {
+    version: 'Build 9',
+    date: 'December 10, 2025',
+    hash: 'pending',
+    title: 'Railway Python Backend',
+    changes: [
+      'Deployed Python transcript backend to Railway',
+      'FastAPI with youtube-transcript-api library',
+      'Better error handling for YouTube blocking',
+      'Fallback architecture for reliability',
+    ],
+    type: 'feature'
+  },
+  {
+    version: 'Build 8',
+    date: 'December 10, 2025',
+    hash: 'pending',
+    title: 'Vercel API Improvements',
+    changes: [
+      'Enhanced Vercel serverless functions',
+      'Better error messages for transcript failures',
+      'Video info fallback to oEmbed API',
+    ],
+    type: 'improvement'
+  },
+  {
     version: 'Build 7',
     date: 'December 10, 2025',
     hash: 'pending',

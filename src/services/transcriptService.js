@@ -1,25 +1,27 @@
 // Transcript extraction service
-// Uses Railway Python backend in production, local server in development
+// Tries client-side fetching first (uses user's IP), falls back to server
 
 import { getYouTubeThumbnail, formatDuration } from './youtubeUtils'
+import { processVideoClient, getVideoInfo as getVideoInfoClient } from './clientTranscript'
 
-// Auto-detect API base URL
+// Auto-detect API base URL for server fallback
 const getApiBase = () => {
-  // Check for Railway backend URL (set this in Vercel env vars)
   if (import.meta.env.VITE_BACKEND_URL) {
     return import.meta.env.VITE_BACKEND_URL
   }
-  // In production without backend URL, try Vercel API (may not work for transcripts)
   if (import.meta.env.PROD) {
     return '/api'
   }
-  // In development, use local server
   return import.meta.env.VITE_API_URL || 'http://localhost:3002/api'
 }
 
 const API_BASE = getApiBase()
 
+// Prefer client-side fetching (uses user's IP, avoids cloud IP blocks)
+const PREFER_CLIENT_SIDE = true
+
 console.log(`📡 API Base: ${API_BASE}`)
+console.log(`🌐 Client-side fetching: ${PREFER_CLIENT_SIDE ? 'enabled' : 'disabled'}`)
 
 // Helper to delay execution
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
@@ -140,15 +142,27 @@ export const fetchTranscript = async (videoId, maxRetries = 2) => {
 
 // Process a single video and return full video data with transcript
 export const processVideo = async (videoId, onProgress) => {
+  // Try client-side first (uses user's IP - more reliable)
+  if (PREFER_CLIENT_SIDE) {
+    try {
+      if (onProgress) onProgress('Fetching transcript (client-side)...')
+      const result = await processVideoClient(videoId)
+      console.log(`✅ Client-side success for ${videoId}`)
+      return result
+    } catch (clientError) {
+      console.warn(`⚠️ Client-side failed for ${videoId}:`, clientError.message)
+      // Fall through to server-side
+    }
+  }
+
+  // Server-side fallback
   try {
     if (onProgress) onProgress('Fetching video info...')
     
-    // First, get video info (this rarely fails)
     const videoInfo = await fetchVideoInfo(videoId)
     
-    if (onProgress) onProgress('Fetching transcript...')
+    if (onProgress) onProgress('Fetching transcript (server)...')
     
-    // Fetch transcript
     const response = await fetch(`${API_BASE}/transcript/${videoId}`)
     const data = await response.json()
     
@@ -159,7 +173,6 @@ export const processVideo = async (videoId, onProgress) => {
       throw error
     }
     
-    // Calculate duration from transcript if not provided
     let duration = data.lengthSeconds || 0
     if (!duration && data.transcript && data.transcript.length > 0) {
       const lastSegment = data.transcript[data.transcript.length - 1]
