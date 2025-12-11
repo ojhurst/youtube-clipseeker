@@ -3,9 +3,22 @@ import { BUILD_NUMBER } from '../config/build'
 
 const changelog = [
   {
-    version: 'Build 13',
+    version: 'Build 14',
     date: 'December 10, 2025',
     hash: 'pending',
+    title: 'Mobile Video Detail Fix',
+    changes: [
+      'Video detail page now scrolls to top on load (shows player first)',
+      'Mobile: floating "Jump to match" button instead of auto-scrolling',
+      'Desktop: auto-scroll delayed to 1.5s so user sees video first',
+      'Better mobile UX - no more scrolling up to find the player',
+    ],
+    type: 'fix'
+  },
+  {
+    version: 'Build 13',
+    date: 'December 10, 2025',
+    hash: 'eb75d7b',
     title: 'Smart Input Box',
     changes: [
       'Main input now handles both URL paste AND transcript search',

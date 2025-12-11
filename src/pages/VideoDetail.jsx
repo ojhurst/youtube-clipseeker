@@ -159,18 +159,36 @@ export default function VideoDetail() {
     return () => clearInterval(interval)
   }, [isPlayerReady])
 
-  // Scroll to highlighted segment on load
+  // Scroll to top of page on mount
   useEffect(() => {
-    if (highlightRef.current && startTime && !hasScrolledToHighlight) {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [videoId])
+
+  // On desktop, auto-scroll to highlighted segment after delay
+  // On mobile, we'll show a "Jump to match" button instead
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
+  
+  useEffect(() => {
+    if (highlightRef.current && startTime && !hasScrolledToHighlight && !isMobile) {
       setTimeout(() => {
         highlightRef.current?.scrollIntoView({ 
           behavior: 'smooth', 
           block: 'center' 
         })
         setHasScrolledToHighlight(true)
-      }, 800)
+      }, 1500) // Longer delay to let user see video first
     }
-  }, [startTime, video, hasScrolledToHighlight])
+  }, [startTime, video, hasScrolledToHighlight, isMobile])
+
+  const scrollToHighlight = () => {
+    if (highlightRef.current) {
+      highlightRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      })
+      setHasScrolledToHighlight(true)
+    }
+  }
 
   const seekTo = useCallback((time) => {
     if (playerInstanceRef.current?.seekTo && isPlayerReady) {
@@ -227,6 +245,21 @@ export default function VideoDetail() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Mobile: Floating "Jump to match" button */}
+      {searchTerm && matchingSegments.length > 0 && !hasScrolledToHighlight && isMobile && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+          <button
+            onClick={scrollToHighlight}
+            className="flex items-center gap-2 px-4 py-3 bg-yt-red text-white rounded-full shadow-lg shadow-yt-red/30 hover:bg-yt-dark-red transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+            <span className="font-medium">Jump to match</span>
+          </button>
+        </div>
+      )}
+
       {/* Back button */}
       <div className="flex items-center justify-between mb-6">
         <button
