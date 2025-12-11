@@ -8,7 +8,6 @@ export default async function handler(request) {
   const url = new URL(request.url)
   const videoId = url.pathname.split('/').pop()
 
-  // Handle OPTIONS for CORS preflight
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders() })
   }
@@ -23,10 +22,7 @@ export default async function handler(request) {
   try {
     console.log(`Fetching transcript for: ${videoId}`)
     
-    // Get video info
     const videoInfo = await fetchVideoInfo(videoId)
-
-    // Try to get transcript
     const transcript = await fetchTranscript(videoId)
 
     if (!transcript || transcript.length === 0) {
@@ -34,8 +30,7 @@ export default async function handler(request) {
         JSON.stringify({ 
           error: 'No transcript available for this video',
           videoId,
-          ...videoInfo,
-          debug: 'Transcript array was empty after extraction'
+          ...videoInfo
         }),
         { status: 404, headers: corsHeaders() }
       )
@@ -59,8 +54,7 @@ export default async function handler(request) {
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Failed to fetch transcript',
-        videoId,
-        debug: error.stack
+        videoId
       }),
       { status: 500, headers: corsHeaders() }
     )
@@ -108,13 +102,6 @@ async function fetchTranscript(videoId) {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
       'Accept-Language': 'en-US,en;q=0.5',
-      'Accept-Encoding': 'gzip, deflate, br',
-      'Connection': 'keep-alive',
-      'Upgrade-Insecure-Requests': '1',
-      'Sec-Fetch-Dest': 'document',
-      'Sec-Fetch-Mode': 'navigate',
-      'Sec-Fetch-Site': 'none',
-      'Sec-Fetch-User': '?1',
     }
   })
   
@@ -124,105 +111,85 @@ async function fetchTranscript(videoId) {
 
   const html = await response.text()
   
-  // Method 1: Look for captionTracks in ytInitialPlayerResponse
-  let captionUrl = null
+  // Simple and direct: find the timedtext URL
+  // Look for: "baseUrl":"https://www.youtube.com/api/timedtext?...
+  const timedtextMatch = html.match(/"baseUrl"\s*:\s*"(https:\/\/www\.youtube\.com\/api\/timedtext[^"]+)"/i)
   
-  // Try multiple patterns to find caption URL
-  const patterns = [
-    // Pattern 1: captionTracks array
-    /"captionTracks":\s*\[\s*\{[^}]*"baseUrl":\s*"([^"]+)"/,
-    // Pattern 2: playerCaptionsTracklistRenderer
-    /playerCaptionsTracklistRenderer.*?"captionTracks":\s*\[\s*\{[^}]*"baseUrl":\s*"([^"]+)"/s,
-    // Pattern 3: Look for timedtext URL directly
-    /"(https:\/\/www\.youtube\.com\/api\/timedtext[^"]+)"/,
-    // Pattern 4: Different format
-    /captionTracks.*?baseUrl.*?"(https:[^"]+timedtext[^"]+)"/s,
-  ]
-
-  for (const pattern of patterns) {
-    const match = html.match(pattern)
-    if (match) {
-      captionUrl = match[1]
-        .replace(/\\u0026/g, '&')
-        .replace(/\\"/g, '"')
-        .replace(/\\\//g, '/')
-      console.log(`Found caption URL with pattern: ${pattern.toString().substring(0, 50)}...`)
-      break
-    }
-  }
-
-  // If no URL found, try to extract from ytInitialPlayerResponse JSON
-  if (!captionUrl) {
-    const playerResponseMatch = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});/)
-    if (playerResponseMatch) {
-      try {
-        const playerData = JSON.parse(playerResponseMatch[1])
-        const captions = playerData?.captions?.playerCaptionsTracklistRenderer?.captionTracks
-        if (captions && captions.length > 0) {
-          // Prefer English, fall back to first available
-          const englishTrack = captions.find(t => t.languageCode === 'en' || t.languageCode?.startsWith('en'))
-          captionUrl = (englishTrack || captions[0]).baseUrl
-          console.log('Found caption URL from JSON parse')
-        }
-      } catch (e) {
-        console.warn('Failed to parse ytInitialPlayerResponse:', e.message)
+  if (!timedtextMatch) {
+    // Try alternative: look in captionTracks
+    const captionTracksMatch = html.match(/"captionTracks"\s*:\s*\[([\s\S]*?)\]/)
+    if (captionTracksMatch) {
+      const tracksContent = captionTracksMatch[1]
+      const urlMatch = tracksContent.match(/"baseUrl"\s*:\s*"([^"]+)"/)
+      if (urlMatch) {
+        const captionUrl = urlMatch[1]
+          .replace(/\\u0026/g, '&')
+          .replace(/\\\//g, '/')
+        return await fetchAndParseCaptions(captionUrl)
       }
     }
+    
+    // Check if video exists but has no captions
+    if (html.includes('"playabilityStatus"') && !html.includes('captionTracks')) {
+      throw new Error('This video does not have captions available')
+    }
+    
+    throw new Error('Could not find caption URL')
   }
 
-  if (!captionUrl) {
-    // Check if captions are disabled
-    if (html.includes('"playabilityStatus":{"status":"ERROR"')) {
-      throw new Error('Video is unavailable')
-    }
-    if (html.includes('"captions":{}') || !html.includes('captionTracks')) {
-      throw new Error('No captions available - video may not have transcripts enabled')
-    }
-    throw new Error('Could not find caption URL in video page')
-  }
-
-  // Fetch the caption XML/JSON
-  console.log(`Fetching captions from: ${captionUrl.substring(0, 100)}...`)
+  // Clean up the URL (unescape unicode)
+  const captionUrl = timedtextMatch[1]
+    .replace(/\\u0026/g, '&')
+    .replace(/\\\//g, '/')
   
-  const captionResponse = await fetch(captionUrl, {
+  return await fetchAndParseCaptions(captionUrl)
+}
+
+async function fetchAndParseCaptions(captionUrl) {
+  console.log(`Fetching captions from: ${captionUrl.substring(0, 80)}...`)
+  
+  const response = await fetch(captionUrl, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     }
   })
   
-  if (!captionResponse.ok) {
-    throw new Error(`Failed to fetch captions: ${captionResponse.status}`)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch captions: ${response.status}`)
   }
 
-  const captionData = await captionResponse.text()
+  const data = await response.text()
   
-  // Check if it's XML or JSON
-  if (captionData.trim().startsWith('<?xml') || captionData.trim().startsWith('<')) {
-    return parseTranscriptXml(captionData)
-  } else if (captionData.trim().startsWith('{') || captionData.trim().startsWith('[')) {
-    return parseTranscriptJson(captionData)
-  } else {
-    // Try XML parsing anyway
-    return parseTranscriptXml(captionData)
+  // Try XML parsing first (most common)
+  if (data.includes('<text')) {
+    return parseTranscriptXml(data)
   }
+  
+  // Try JSON parsing
+  if (data.trim().startsWith('{') || data.trim().startsWith('[')) {
+    return parseTranscriptJson(data)
+  }
+  
+  // Fallback to XML parsing
+  return parseTranscriptXml(data)
 }
 
 function parseTranscriptXml(xml) {
   const segments = []
   
-  // Parse <text start="..." dur="...">content</text> elements
-  const textRegex = /<text[^>]*start="([^"]+)"[^>]*dur="([^"]+)"[^>]*>([^<]*(?:<[^/][^<]*)*)<\/text>/g
+  // Match <text start="X" dur="Y">content</text>
+  const regex = /<text[^>]*start="([\d.]+)"[^>]*(?:dur="([\d.]+)")?[^>]*>([\s\S]*?)<\/text>/gi
   let match
 
-  while ((match = textRegex.exec(xml)) !== null) {
+  while ((match = regex.exec(xml)) !== null) {
     const start = parseFloat(match[1])
-    const duration = parseFloat(match[2])
+    const duration = match[2] ? parseFloat(match[2]) : 5
     let text = match[3]
     
-    // Decode HTML entities and clean up
-    text = decodeHtmlEntities(text)
-      .replace(/<[^>]+>/g, '') // Remove any HTML tags
-      .replace(/\n/g, ' ')
+    // Decode HTML entities
+    text = decodeEntities(text)
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, ' ')
       .trim()
 
     if (text) {
@@ -235,24 +202,6 @@ function parseTranscriptXml(xml) {
     }
   }
 
-  // If no matches with dur, try simpler pattern
-  if (segments.length === 0) {
-    const simpleRegex = /<text[^>]*start="([^"]+)"[^>]*>([^<]+)<\/text>/g
-    while ((match = simpleRegex.exec(xml)) !== null) {
-      const start = parseFloat(match[1])
-      let text = decodeHtmlEntities(match[2]).trim()
-      
-      if (text) {
-        segments.push({
-          start,
-          duration: 5,
-          end: start + 5,
-          text
-        })
-      }
-    }
-  }
-
   return segments
 }
 
@@ -260,14 +209,12 @@ function parseTranscriptJson(jsonStr) {
   try {
     const data = JSON.parse(jsonStr)
     const segments = []
-    
-    // Handle various JSON formats YouTube might return
     const events = data.events || data.transcript || data
     
     if (Array.isArray(events)) {
       for (const event of events) {
         if (event.segs) {
-          const text = event.segs.map(s => s.utf8).join('').trim()
+          const text = event.segs.map(s => s.utf8 || '').join('').trim()
           if (text) {
             segments.push({
               start: (event.tStartMs || 0) / 1000,
@@ -276,25 +223,18 @@ function parseTranscriptJson(jsonStr) {
               text
             })
           }
-        } else if (event.text) {
-          segments.push({
-            start: event.start || 0,
-            duration: event.duration || 5,
-            end: (event.start || 0) + (event.duration || 5),
-            text: event.text
-          })
         }
       }
     }
     
     return segments
   } catch (e) {
-    console.error('Failed to parse JSON transcript:', e)
+    console.error('JSON parse error:', e)
     return []
   }
 }
 
-function decodeHtmlEntities(text) {
+function decodeEntities(text) {
   return text
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -302,6 +242,6 @@ function decodeHtmlEntities(text) {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(num))
-    .replace(/&#x([a-fA-F0-9]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n))
+    .replace(/&#x([a-fA-F0-9]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
 }
